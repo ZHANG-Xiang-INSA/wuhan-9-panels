@@ -365,7 +365,8 @@ function prep(root, idx) {
   const b = byIdx[idx];
   const codes = new Set(b.clips.map(c => c.code));
   const slips = [], clips = [];
-  let backing = null, mortar = null;
+  const backing = [];
+  let mortar = null;
   root.traverse(o => {
     if (!o.isMesh) return;
     const n = o.name.replace(/^CLIP_/, '').replace(/\.\d+$/, '');
@@ -375,7 +376,11 @@ function prep(root, idx) {
     // the mortar has to be picked off before the fall-through, or it lands in `backing` and the
     // two fight over one slot: whichever the traverse reached last would be the only one drawn
     else if (n === 'MORTAR') { o.userData = {kind: 'mortar'}; mortar = o; }
-    else { o.userData = {kind: 'board'}; backing = o; }
+    // a LIST, not one mesh. The backing carries two materials - the setting-out on the face
+    // the slips sit on, plain board everywhere else - and glTF splits a mesh with two materials
+    // into two primitives, which arrive here as two meshes. Keeping only the last one left the
+    // other permanently visible when the board layer was switched off.
+    else { o.userData = {kind: 'board'}; backing.push(o); }
   });
   root.rotation.x = MODEL_TILT;
   root.updateMatrixWorld(true);
@@ -493,13 +498,11 @@ function paint() {
     cur.mortar.material = clayMat(col.mortar, false);
     cur.mortar.visible = layer.mortar;
   }
-  if (cur.backing) {
-    // The backing keeps the material that came in the GLB. It carries the setting-out texture -
-    // every slip's outline, its clip's tray, the fixing holes and a code inside each - and
-    // replacing it with a plain clay colour, which is what used to happen here, wiped all of that
-    // the moment the board was drawn.
-    cur.backing.visible = layer.board;
-  }
+  // The backing keeps the materials that came in the GLB. They carry the setting-out texture -
+  // every slip's outline, its clip's tray, the fixing holes and a code inside each - and replacing
+  // them with a plain clay colour, which is what used to happen here, wiped all of that the moment
+  // the board was drawn.
+  for (const o of cur.backing) o.visible = layer.board;
 }
 const OUT_LOCAL = new THREE.Vector3(0, 1, 0);   // the face normal inside the untilted model
 function applyExplode() {

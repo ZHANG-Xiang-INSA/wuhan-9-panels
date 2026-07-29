@@ -104,6 +104,37 @@ if os.path.exists(_gp):
     GAIN = json.load(open(_gp, encoding='utf-8'))
 
 
+def backing_mesh(rect, w, h, plain, face):
+    """the board, with the setting-out on the face the slips sit on and nothing on the back
+
+    Two material slots on one mesh: the top face gets the setting-out, everything else - the back
+    and the four 12 mm edges - stays plain board.  The first version put a planar UV on the whole
+    prism and one material over it, so the marks came out on the back as well, mirrored, and
+    smeared down the edges.
+
+    glTF splits a mesh with two materials into two primitives, which reach the viewer as two
+    meshes; app.js collects the backing as a list for that reason.
+    """
+    bm = bmesh.new()
+    uvl = bm.loops.layers.uv.new('UVMap')
+    prism(bm, rect, -PLATE*S, 0.0)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.faces.ensure_lookup_table()
+    for f in bm.faces:
+        top = f.normal.z > 0.999
+        f.material_index = 1 if top else 0
+        for lp in f.loops:
+            # the board's own rectangle mapped to 0..1, so the setting-out lands on it at 1:1
+            # whatever the board size.  Only the top face reads it.
+            lp[uvl].uv = (lp.vert.co.x*1000.0/w+0.5, lp.vert.co.y*1000.0/h+0.5)
+    me = bpy.data.meshes.new('backing'); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new('backing', me)
+    ob.data.materials.append(plain)
+    ob.data.materials.append(face)
+    bpy.context.collection.objects.link(ob)
+    return ob
+
+
 def setout_mat(idx, base):
     """the backing board with its setting-out marked on it
 
@@ -388,7 +419,7 @@ def slip_mesh(polys, gids, name, mat):
     return ob
 
 
-def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0, uv_rect=None):
+def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0):
     # no colour layer here: the backing's material does not read one, and an unused one only
     # rides along into the GLB as a junk COLOR_0 the viewer then has to know to ignore
     bm = bmesh.new()
@@ -399,13 +430,7 @@ def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0, uv_rect=None):
     bm.faces.ensure_lookup_table()
     for f in bm.faces:
         for lp in f.loops:
-            if uv_rect:
-                # the board's own rectangle mapped to 0..1, so the setting-out texture lands on it
-                # at 1:1 whatever the board size
-                lp[uvl].uv = (lp.vert.co.x*1000.0/uv_rect[0]+0.5,
-                              lp.vert.co.y*1000.0/uv_rect[1]+0.5)
-            else:
-                lp[uvl].uv = (lp.vert.co.x*uv_scale, lp.vert.co.y*uv_scale)
+            lp[uvl].uv = (lp.vert.co.x*uv_scale, lp.vert.co.y*uv_scale)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     ob = bpy.data.objects.new(name, me); ob.data.materials.append(mat)
     bpy.context.collection.objects.link(ob)
@@ -907,8 +932,9 @@ def build(b):
 
     cen = lambda p: [[q[0]-cx, q[1]-cy] for q in p]
 
-    plain_mesh([cen([[0, 0], [w, 0], [w, h], [0, h]])], -PLATE*S, 0.0, 'backing', m_back,
-               uv_rect=(w, h))
+    backing_mesh(cen([[0, 0], [w, 0], [w, h], [0, h]]), w, h,
+                 clay('board%d' % b['idx'], hexv(col['mortar']), rough=0.94, relief=0.0006,
+                      grain=520.0, tint=False), m_back)
     mortar_mesh([cen(p['p']) for p in b['pieces']], cen([[0, 0], [w, 0], [w, h], [0, h]]),
                 b['joint'], CLIP_T+SLIP_T*S, 'MORTAR', m_joint)
 

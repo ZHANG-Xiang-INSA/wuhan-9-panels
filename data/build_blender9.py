@@ -104,6 +104,41 @@ if os.path.exists(_gp):
     GAIN = json.load(open(_gp, encoding='utf-8'))
 
 
+def setout_mat(idx, base):
+    """the backing board with its setting-out marked on it
+
+    setout9_tex.py bakes the same lines and codes dxf/08 plots - every slip's outline, its clip's
+    tray, the two fixing holes, and a code inside each - onto the board's own colour.  Switch the
+    slips off in the viewer, or pull them off with the exploded view, and this is what is
+    underneath, which is the whole point: the fitter reads the board.
+
+    A texture rather than real line geometry.  The lines would be tens of thousands of extra edges
+    per board in a file the website downloads, for something that is a surface mark on the real
+    thing anyway.
+    """
+    m = bpy.data.materials.new('setout%d' % idx); m.use_nodes = True
+    nt = m.node_tree; nt.nodes.clear(); L = nt.links.new
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    bsdf.inputs['Roughness'].default_value = 0.94
+    if 'Specular IOR Level' in bsdf.inputs:
+        bsdf.inputs['Specular IOR Level'].default_value = 0.22
+    p = os.path.join(ROOT, 'site', 'textures', 'setout_board_%d.png' % idx)
+    if os.path.exists(p):
+        img = bpy.data.images.load(p, check_existing=True)
+        img.colorspace_settings.name = 'sRGB'
+        tex = nt.nodes.new('ShaderNodeTexImage')
+        tex.image = img
+        tex.extension = 'EXTEND'
+        uv = nt.nodes.new('ShaderNodeUVMap'); uv.uv_map = 'UVMap'
+        L(uv.outputs['UV'], tex.inputs['Vector'])
+        L(tex.outputs['Color'], bsdf.inputs['Base Color'])
+    else:
+        bsdf.inputs['Base Color'].default_value = base
+    L(bsdf.outputs['BSDF'], out.inputs['Surface'])
+    return m
+
+
 def clay(name, base, rough=0.87, relief=0.0009, grain=300.0, tint=True, gain=1.0):
     """Fired clay, four scales deep.
 
@@ -353,7 +388,7 @@ def slip_mesh(polys, gids, name, mat):
     return ob
 
 
-def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0):
+def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0, uv_rect=None):
     # no colour layer here: the backing's material does not read one, and an unused one only
     # rides along into the GLB as a junk COLOR_0 the viewer then has to know to ignore
     bm = bmesh.new()
@@ -364,7 +399,13 @@ def plain_mesh(polys, z0, z1, name, mat, uv_scale=1.0):
     bm.faces.ensure_lookup_table()
     for f in bm.faces:
         for lp in f.loops:
-            lp[uvl].uv = (lp.vert.co.x*uv_scale, lp.vert.co.y*uv_scale)
+            if uv_rect:
+                # the board's own rectangle mapped to 0..1, so the setting-out texture lands on it
+                # at 1:1 whatever the board size
+                lp[uvl].uv = (lp.vert.co.x*1000.0/uv_rect[0]+0.5,
+                              lp.vert.co.y*1000.0/uv_rect[1]+0.5)
+            else:
+                lp[uvl].uv = (lp.vert.co.x*uv_scale, lp.vert.co.y*uv_scale)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     ob = bpy.data.objects.new(name, me); ob.data.materials.append(mat)
     bpy.context.collection.objects.link(ob)
@@ -858,8 +899,7 @@ def build(b):
     g = float(GAIN.get(str(b['idx']), 1.0))
     m_brick = clay('brick%d' % b['idx'], hexv(col['brick']), gain=g)
     m_cut = clay('cut%d' % b['idx'], hexv(col['dark']), gain=g)
-    m_back = clay('mortar%d' % b['idx'], hexv(col['mortar']), rough=0.94, relief=0.0006,
-                  grain=520.0, tint=False)
+    m_back = setout_mat(b['idx'], hexv(col['mortar']))
     m_joint = clay('joint%d' % b['idx'], hexv(col['mortar']), rough=0.96, relief=0.0004,
                    grain=760.0, tint=False)
     m_rail = metal('rail', (0.52, 0.56, 0.60, 1.0))
@@ -867,7 +907,8 @@ def build(b):
 
     cen = lambda p: [[q[0]-cx, q[1]-cy] for q in p]
 
-    plain_mesh([cen([[0, 0], [w, 0], [w, h], [0, h]])], -PLATE*S, 0.0, 'backing', m_back)
+    plain_mesh([cen([[0, 0], [w, 0], [w, h], [0, h]])], -PLATE*S, 0.0, 'backing', m_back,
+               uv_rect=(w, h))
     mortar_mesh([cen(p['p']) for p in b['pieces']], cen([[0, 0], [w, 0], [w, h], [0, h]]),
                 b['joint'], CLIP_T+SLIP_T*S, 'MORTAR', m_joint)
 

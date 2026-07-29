@@ -8,6 +8,12 @@
 
 # 武汉摄影展板 · 九块板
 
+**已上线**：网站 <https://zhang-xiang-insa.github.io/wuhan-9-panels/>，
+仓库 <https://github.com/ZHANG-Xiang-INSA/wuhan-9-panels>（public，`main` 全套，`gh-pages` 是 `site/`
+的内容作站点根）。发布用的是**另一个只装这个项目的仓库**：本仓库的根是 `Documents\Claude\Projects`，
+还装着二十几个无关项目，不能整个推。发布副本里不含 `proposal/`（客户原始 PDF 与抽出的 mock-up，
+86 MB），所以 `panels9_sheet.py` 与 `proposal_compare.py` 在那边重跑需要先补回该目录。
+
 砖片 **215 × 65 × 20**，九块板，每块一种排布。全部几何由 `data/panels9_build.py` 生成，
 图纸、DXF、三维模型和网页读的都是同一份数据，不会互相走样。
 
@@ -161,6 +167,44 @@ warm grey white RAL 9001，板 7 natural，板 8-9 neutral white。这些早就�
 
 渲染图全部重出，网页与下载包里的正式展示图都是有砂浆版本。
 
+## 背板放线图：dxf/08，以及模型里的板面
+
+工人在现场最难的一步不是切砖也不是拧螺丝，是**找位置**：手里一片 T03，要在 1.5 米见方的人字纹里
+认出它该落在哪。dxf/05 画的是砌完的样子，dxf/07 画的是零件本身，两张都回答不了这个问题。
+
+`dxf/08_setout_CN_EN.dxf` 就是回答它的那张：九块板逐块 1:1，板上画出
+
+- 每一片砖的**轮廓**（图层 `P#_SLIP`）
+- 压住它的**卡扣托盘轮廓**（`P#_CLIP`）
+- 卡扣下的**两个 3.5 固定孔**（`P#_HOLE`），带十字中心线
+- **编号写在框里**：砖型写在砖片里，卡扣型写在卡扣里
+
+制造商按 1:1 出图、把这些画到背板上，之后师傅只看板：线里放砖，框里放扣，孔位钻孔。九块板都是
+一砖一扣，所以砖轮廓和卡扣框永远成对。
+
+字高统一 **9 mm**，砖和卡扣一样大。1414 片里有 **1406 片**用得上 9 mm；板 8 的 8 片三角件例外，
+降到 5–6 mm——那不是没摆好，是摆不下：它的内切圆半径只有 19，一个 9 mm 的 `P8T02` 就要占掉 14.7，
+再加一个 `T02` 的 9.5，两个中心至少要隔开 24，放不进去。砖和卡扣的字**永远一起降**，所以那一对读起来
+仍是同一号。
+
+标签位置是搜出来的，不是取中心：中心会压到卡扣框（102.5×65 的砖上，卡扣托盘 50×68，几乎占满），
+也会压到孔。三轮下来的结果——**2933 个标注、59546 段线，0 处压线、0 处压字**：
+
+| 试过的做法 | 结果 |
+|---|---|
+| 取形心 | 薄片和三角件上标注穿出轮廓 |
+| 取内点最远点（poles of inaccessibility） | 好了，但 263 个标注压在钻孔十字上 |
+| 加孔位避让 | 剩 28 个：板 8 三角件放不下两行字 |
+| 按框（不按外接圆）判定 + 放不下就整对降字号 | 剩 172 个：砖号只判了中心在框外，方框仍跨过卡扣框边 |
+| 整个方框都要在卡扣框外 | **0** |
+
+**模型和网页的背板也画上了。** `setout9_tex.py` 把同一套线和字烤成贴图（0.38 mm/像素，约 4000²），
+贴在背板正面，用板自己的颜色打底。网页里关掉「砖片」层、或者拉「拆开」滑块，底下就是这张图。
+用贴图不用真线条：真线条一块板要多几万条边，而网页要下载它，何况在真板上这本来就只是表面画线。
+
+顺带修掉一个会让这件事白做的地方：`app.js` 画板时会把背板的材质换成一块纯色黏土，
+那会**把贴图整个抹掉**。现在背板保留 GLB 里带来的材质。
+
 ## 砖片下料图：dxf/07 与 S9
 
 原先只有卡扣有零件图（dxf/06、S8），砖片只有排布图（dxf/05、S7）。排布图给的是**贴砖的人**——
@@ -290,13 +334,14 @@ warm grey white RAL 9001，板 7 natural，板 8-9 neutral white。这些早就�
 | 5 | `drawings\S8_clips_CN_EN.png` | S8 卡扣详图，三种卡扣各平面/断面/展开料，展开料带折向箭头 | 947 KB |
 | 6 | `drawings\S8_clips_CN_EN.svg` | S8 矢量版 | 394 KB |
 | 7 | `dxf\07_bricks_CN_EN.dxf` | 砖片下料图：12 个砖型逐型 1:1，逐边标注、非直角标角度，每型一个图层 | 154 KB |
-| 8 | `drawings\S9_bricks_CN_EN.png` | S9 砖片下料图：12 个零件同一比例排开 + 明细表 | 721 KB |
-| 9 | `drawings\S9_bricks_CN_EN.svg` | S9 矢量版 | 352 KB |
-| 10 | `docs\joint_report.html` | 灰缝为什么从 7/7/5 改成 10 的说明，英文配图 | 289 KB |
-| 11 | `docs\board_comparison.pdf` | 原始要求与最终设计对照表，一板一行：要求 / 提案原图 / 最终渲染 / 实际尺寸与变更（英文） | 1.2 MB |
-| 12 | `site\` | 整个网站，纯静态，目录原样上传即可 | 215 MB |
+| 8 | `dxf\08_setout_CN_EN.dxf` | 背板放线图：九块板逐块 1:1，砖轮廓 + 卡扣托盘 + 固定孔 + 框内编号，图层按板分组 | 2.5 MB |
+| 9 | `drawings\S9_bricks_CN_EN.png` | S9 砖片下料图：12 个零件同一比例排开 + 明细表 | 721 KB |
+| 10 | `drawings\S9_bricks_CN_EN.svg` | S9 矢量版 | 352 KB |
+| 11 | `docs\joint_report.html` | 灰缝为什么从 7/7/5 改成 10 的说明，英文配图 | 289 KB |
+| 12 | `docs\board_comparison.pdf` | 原始要求与最终设计对照表，一板一行：要求 / 提案原图 / 最终渲染 / 实际尺寸与变更（英文） | 1.2 MB |
+| 13 | `site\` | 整个网站，纯静态，目录原样上传即可 | 215 MB |
 
-`site\downloads\` 里是第 1 到 9 项和第 11 项的副本，供网页下载，与主本逐字节一致。副本由 `data/pack_downloads.py` 自动刷新，不用手抄：以前忘了复制，网页和 zip 就一直发着昨天那版图纸，而上游每一项检查都是过的。
+`site\downloads\` 里是第 1 到 10 项和第 12 项的副本，供网页下载，与主本逐字节一致。副本由 `data/pack_downloads.py` 自动刷新，不用手抄：以前忘了复制，网页和 zip 就一直发着昨天那版图纸，而上游每一项检查都是过的。
 
 ### 二、网站内部
 
@@ -318,7 +363,7 @@ warm grey white RAL 9001，板 7 natural，板 8-9 neutral white。这些早就�
 
 | 路径 | 内容 |
 |---|---|
-| `data\` | 22 个生成脚本与中间数据，几何的真正来源 |
+| `data\` | 25 个生成脚本与中间数据，几何的真正来源 |
 | `proposal\` | 客户原始 PDF 与抽出的九张 mock-up，86 MB |
 
 ### 四、旧版，别用
@@ -339,6 +384,8 @@ warm grey white RAL 9001，板 7 natural，板 8-9 neutral white。这些早就�
 | 6 | `python data/site_export.py` | `site/data/boards.json` |
 | 6a | `python data/bricks9_dxf.py` | `dxf/07_bricks_CN_EN.dxf`（读 `boards.json` 里的 B01..B12 编号，故必须排在第 6 步之后） |
 | 6b | `python data/bricks9_draw.py` | `drawings/S9_*` |
+| 6c | `python data/setout9_dxf.py` | `dxf/08_setout_CN_EN.dxf` 背板放线图 |
+| 6d | `python data/setout9_tex.py` | `site/textures/setout_board_1..9.png`，第 7 步的背板贴图，必须在它之前跑 |
 | 7 | `blender -b -P data/build_blender9.py` | `site/models/*.glb`、`site/blend/*.blend`、`site/renders/*.png` |
 | 8 | `python data/calibrate_albedo.py` | `data/albedo_gain.json`，然后重跑第 7 步 |
 | 9 | `python data/web_assets.py` | `site/renders/*.webp` |
@@ -411,6 +458,6 @@ python -m http.server 8788 --directory site
 | DXF 对 `boards.json` | 逐块按顶点匹配，扣除明细表色卡 | **0.000 mm** |
 | GLB | 退化三角形、零面积 UV | **0** |
 | 砖色 | 对 `pdf_colours.json` 采样值 | 最差 **4 / 255** |
-| `site/downloads/` | 与主本 MD5 比对 | 10 份**逐字节一致** |
+| `site/downloads/` | 与主本 MD5 比对 | 11 份**逐字节一致** |
 | 网页 | 九块板全部链接与图片、九个 GLB | 82 项，**全部 200** |
 | 汇总表 | 与 `boards.json` 逐行逐值比对、切语言与切板后状态 | 31 项 **全过** |

@@ -28,6 +28,7 @@ MIRROR = [('dxf/05_nine_boards_CN_EN.dxf', '05_nine_boards_CN_EN.dxf'),
           ('dxf/07_bricks_CN_EN.dxf', '07_bricks_CN_EN.dxf'),
           ('drawings/S9_bricks_CN_EN.svg', 'S9_bricks_CN_EN.svg'),
           ('drawings/S9_bricks_CN_EN.png', 'S9_bricks_CN_EN.png'),
+          ('dxf/08_setout_CN_EN.dxf', '08_setout_CN_EN.dxf'),
           ('docs/board_comparison.pdf', 'board_comparison.pdf')]
 for src, dst in MIRROR:
     s = os.path.join(ROOT, src)
@@ -49,6 +50,7 @@ items = [('downloads/05_nine_boards_CN_EN.dxf', '01_drawings/05_nine_boards_CN_E
          ('downloads/07_bricks_CN_EN.dxf', '01_drawings/07_bricks_CN_EN.dxf'),
          ('downloads/S9_bricks_CN_EN.svg', '01_drawings/S9_bricks.svg'),
          ('downloads/S9_bricks_CN_EN.png', '01_drawings/S9_bricks.png'),
+         ('downloads/08_setout_CN_EN.dxf', '01_drawings/08_setout_CN_EN.dxf'),
          ('downloads/board_comparison.pdf', '01_drawings/board_comparison.pdf'),
          ('data/boards.json', '03_data/boards.json')]
 for b in D['boards']:
@@ -56,9 +58,14 @@ for b in D['boards']:
     items.append(('models/board_%d.glb' % i, '02_boards/board_%02d/board_%02d.glb' % (i, i)))
     items.append(('blend/board_%d.blend' % i,
                   '02_boards/board_%02d/board_%02d.blend' % (i, i)))
+    # the WEB renders, not the print masters.  Twenty-seven 1500 px PNGs are 75 MB of a
+    # 100 MB zip, and GitHub refuses any file over 100 MiB - adding dxf/08 took the archive to
+    # 100.39 and the push would have been rejected.  The masters are one click each in the Files
+    # section of the site and in site/renders; what belongs in a one-click bundle is the drawings,
+    # the models and the data.
     for tag in ('front', 'hero', 'detail'):
-        items.append(('renders/b%d_%s.png' % (i, tag),
-                      '02_boards/board_%02d/b%02d_%s.png' % (i, i, tag)))
+        items.append(('renders/b%d_%s.webp' % (i, tag),
+                      '02_boards/board_%02d/b%02d_%s.webp' % (i, i, tag)))
 
 n = 0
 with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
@@ -72,8 +79,10 @@ with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:
     readme = ['武汉摄影展板 九块板  Wuhan photography boards, nine panels', '',
               '01_drawings  DXF and the two schedule sheets',
               '02_boards    one folder per board: the Blender file, the glTF model and three',
-              '             renders.  Open the .blend and the MORTAR collection can be switched',
-              '             with the eye in the Outliner; it is on, which is the finished board.',
+              '             renders as .webp.  Open the .blend and the MORTAR collection can be',
+              '             switched with the eye in the Outliner; it is on, the finished board.',
+              '             Full-resolution PNG renders are downloaded individually from the site,',
+              '             under Files, or taken from site/renders in the repository.',
               '03_data      boards.json, the geometry every other file is generated from', '']
     for b in D['boards']:
         readme.append('board %02d  %-34s %g x %g mm   joint %g   %d slips   %d brick types'

@@ -99,7 +99,26 @@ def check(path, skip_layers=('BORDER',)):
         T.append((((-w/2, -h/2, w/2, h/2), tuple(e.dxf.insert)[:2], a), s, e.dxf.layer))
     S = [s for e in q(('LINE', 'LWPOLYLINE', 'CIRCLE', 'ARC'))
          if e.dxf.layer not in skip_layers for s in segs(e)]
-    on_geom = [t for t in T if any(seg_rect(a, b, t[0]) for a, b in S)]
+    # A grid over the segments, because the setting-out drawing carries 59,546 of them against
+    # 2,933 pieces of text and the straight product is 175 million tests - it ran for ten minutes.
+    # Each text only ever meets the segments near it.
+    CELL = 150.0
+    G = {}
+    for k, (a, b) in enumerate(S):
+        for gx in range(int(min(a[0], b[0])//CELL), int(max(a[0], b[0])//CELL)+1):
+            for gy in range(int(min(a[1], b[1])//CELL), int(max(a[1], b[1])//CELL)+1):
+                G.setdefault((gx, gy), []).append(k)
+
+    def near(box):
+        r, org, ang = box
+        rad = math.hypot(max(abs(r[0]), abs(r[2])), max(abs(r[1]), abs(r[3])))+2.0
+        out = set()
+        for gx in range(int((org[0]-rad)//CELL), int((org[0]+rad)//CELL)+1):
+            for gy in range(int((org[1]-rad)//CELL), int((org[1]+rad)//CELL)+1):
+                out.update(G.get((gx, gy), ()))
+        return out
+
+    on_geom = [t for t in T if any(seg_rect(S[k][0], S[k][1], t[0]) for k in near(t[0]))]
     on_text = []
     for i, a in enumerate(T):
         for b in T[i+1:]:

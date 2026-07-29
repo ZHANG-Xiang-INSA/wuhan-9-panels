@@ -1,0 +1,5 @@
+# Never touch line endings.  These are deliverables: the DXFs are written CRLF by ezdxf and the
+# whole project guarantees the copies under site/downloads are byte-identical to their masters.
+# Git's autocrlf normalisation broke that silently - the DXF served from Pages came back 130 KB
+# against a 154 KB master, and no check that compares the master to the local copy would see it.
+* -text

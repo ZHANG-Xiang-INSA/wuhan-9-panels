@@ -77,7 +77,7 @@ const T = {
     f_blend: n => `第 ${n} 块板的 Blender 文件，砂浆可用小眼睛开关`,
     f_front: n => `第 ${n} 块板 正视渲染`, f_hero: n => `第 ${n} 块板 立体渲染`,
     f_detail: n => `第 ${n} 块板 掠光局部`,
-    f_dxf1: '九板排布图 DXF', f_dxf2: '卡扣详图 DXF', f_dxf3: '砖片下料图 DXF',
+    f_dxf1: '九板排布图 DXF', f_dxf2: '卡扣详图 DXF', f_dxf3: '砖片下料图 DXF', f_dxf4: '背板放线图 DXF',
     f_s7svg: 'S7 九板排布与砖型表 SVG', f_s7png: 'S7 同上 PNG',
     f_s8svg: 'S8 卡扣详图 SVG', f_s8png: 'S8 同上 PNG',
     f_s9svg: 'S9 砖片下料图 SVG', f_s9png: 'S9 同上 PNG',
@@ -150,7 +150,7 @@ const T = {
     f_blend: n => `Board ${n}, Blender file, mortar on its own collection`,
     f_front: n => `Board ${n} front elevation`, f_hero: n => `Board ${n} hero render`,
     f_detail: n => `Board ${n} raking detail`,
-    f_dxf1: 'Boards, DXF', f_dxf2: 'Clip details, DXF', f_dxf3: 'Brick slips, DXF',
+    f_dxf1: 'Boards, DXF', f_dxf2: 'Clip details, DXF', f_dxf3: 'Brick slips, DXF', f_dxf4: 'Setting out on the board, DXF',
     f_s7svg: 'S7 boards and brick schedule, SVG', f_s7png: 'S7 as above, PNG',
     f_s8svg: 'S8 clip details, SVG', f_s8png: 'S8 as above, PNG',
     f_s9svg: 'S9 brick slips, SVG', f_s9png: 'S9 as above, PNG',
@@ -494,7 +494,10 @@ function paint() {
     cur.mortar.visible = layer.mortar;
   }
   if (cur.backing) {
-    cur.backing.material = clayMat(col.mortar, false);
+    // The backing keeps the material that came in the GLB. It carries the setting-out texture -
+    // every slip's outline, its clip's tray, the fixing holes and a code inside each - and
+    // replacing it with a plain clay colour, which is what used to happen here, wiped all of that
+    // the moment the board was drawn.
     cur.backing.visible = layer.board;
   }
 }
@@ -944,6 +947,7 @@ async function files() {
     ['downloads/07_bricks_CN_EN.dxf', t('f_dxf3'), all],
     ['downloads/S9_bricks_CN_EN.svg', t('f_s9svg'), all],
     ['downloads/S9_bricks_CN_EN.png', t('f_s9png'), all],
+    ['downloads/08_setout_CN_EN.dxf', t('f_dxf4'), all],
     ['downloads/board_comparison.pdf', t('f_cmp'), all],
     ['data/boards.json', t('f_json'), all]
   ];

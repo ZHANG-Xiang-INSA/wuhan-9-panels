@@ -62,6 +62,9 @@ const T = {
     sh_front_s: '板面正投影', sh_hero_s: '整板三维', sh_detail_s: '620 mm 局部',
     s_draw: '图纸', s_draw_p: '九块板共用三张总图。点击看大图，原稿在文件区。',
     sheet7: '九板排布与砖型表', sheet8: '卡扣详图', sheet9: '砖片下料图',
+    no_gl: '这台设备的浏览器没有可用的 WebGL，三维查看器无法运行，上面显示的是这块板的渲染图。'
+         + '页面其余部分（排布、砖型与卡扣明细、图纸、下载）不受影响。'
+         + '换一个较新的浏览器，或在电脑上打开，即可使用三维。',
     nav_sum: '汇总',
     s_sum: '九块板汇总',
     s_sum_p: '九块板合起来的下料表。砖型按尺寸归并，同一尺寸在各板上编号不同也只算一种。',
@@ -135,6 +138,10 @@ const T = {
     s_draw: 'Drawings', s_draw_p: 'Three sheets cover all nine boards. Click to enlarge; originals are under Files.',
     sheet7: 'Boards and brick schedule', sheet8: 'Clip details',
     sheet9: 'Brick slips, cutting drawing',
+    no_gl: 'This browser has no working WebGL, so the 3D viewer cannot run and the picture above '
+         + 'is a render of this board. Everything else on the page - the layouts, the brick and '
+         + 'clip schedules, the drawings and the downloads - is unaffected. Open it in a newer '
+         + 'browser, or on a computer, for the 3D.',
     nav_sum: 'Summary',
     s_sum: 'All nine boards',
     s_sum_p: 'The cutting list for the nine boards together. Brick types are grouped by size, so one size is one row however the boards number it.',
@@ -250,14 +257,31 @@ const TEX = (() => {
    renderer
    ===================================================================== */
 const canvas = $('#gl');
-const renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.NoToneMapping;
+// The viewer is ONE section of this page, and it used to be able to take the whole page with it.
+// three r180 is WebGL2-only, so on a phone without it - an older Android GPU, a webview on a
+// driver blacklist, an iOS context lost under memory pressure - this line threw, and because it
+// runs at module level the throw stopped everything after it: the i18n pass, the board cards,
+// every schedule and the files table. The page went from 4802 characters to 58 and read as simply
+// broken. Nothing below the model needs a GPU, so a failure here now costs the viewer and nothing
+// else; the stage keeps the still render it already shows before you interact with it.
+let renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({canvas, antialias: true, alpha: true});
+} catch (e) {
+  renderer = null;
+}
+const GL = !!renderer;
+if (GL) {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.NoToneMapping;
+}
 
 const scene = new THREE.Scene();
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+if (GL) {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+}
 scene.environmentIntensity = 0.30;
 
 const key = new THREE.DirectionalLight(0xffffff, 2.55 / L0 * 0.42);
@@ -275,8 +299,23 @@ controls.rotateSpeed = 0.85; controls.zoomSpeed = 0.9; controls.panSpeed = 0.7;
 // The page owns the wheel.  With OrbitControls holding it, a scroll anywhere over the stage zoomed
 // the model instead of moving the page, and the stage is tall, so there was no way past the hero
 // without hunting for a gap.  Zoom is on ctrl or cmd + wheel, which is also what maps and CAD do.
-controls.enableZoom = false;
+// Zoom stays off the WHEEL, which the page owns, but a phone has no wheel and pinch is THE
+// gesture: with enableZoom false a two-finger pinch on the canvas did nothing at all, and
+// touch-action:none meant it did not zoom the page either, so there was no way to get closer
+// except the small +/- buttons.  Zoom is enabled and the wheel is taken back below.
+controls.enableZoom = true;
 controls.minPolarAngle = 0; controls.maxPolarAngle = Math.PI;   // let it go right round the back
+// Zoom has to be on for pinch and off for a plain wheel, and OrbitControls has one flag for both.
+// So the flag is dropped for exactly the length of one wheel dispatch: this runs in the capture
+// phase, OrbitControls' own listener on this same element then reads false and returns without
+// preventDefault - leaving the page free to scroll - and the flag is back before anything else
+// happens.  stopImmediatePropagation would have done it too, but it silences EVERY other wheel
+// listener on the canvas, which is more than this needs to say.
+canvas.addEventListener('wheel', e => {
+  if (e.ctrlKey || e.metaKey) return;
+  controls.enableZoom = false;
+  setTimeout(() => { controls.enableZoom = true; }, 0);
+}, {capture: true, passive: true});
 canvas.addEventListener('wheel', e => {
   if (!(e.ctrlKey || e.metaKey)) return;
   e.preventDefault();
@@ -527,6 +566,10 @@ async function show(idx, first) {
   lede(); sections();
   if (location.hash !== '#b' + idx) history.replaceState(null, '', '#b' + idx);
 
+  // Without a context there is nothing to put the model in, so the megabytes are not fetched
+  // either: the stage keeps the still render of this board and the rest of the page carries on.
+  if (!GL) { loadEl.classList.add('gone'); return; }
+
   if (!first) loadEl.classList.remove('gone');
   barI.style.width = cache.has(idx) ? '100%' : '0%';
   const m = await load(idx);
@@ -543,7 +586,7 @@ async function show(idx, first) {
   loadEl.classList.add('gone');
 }
 
-function goLive() { if (!live) { live = true; stage.classList.add('live'); } }
+function goLive() { if (!live && GL) { live = true; stage.classList.add('live'); } }
 ['pointerdown', 'wheel', 'touchstart'].forEach(e =>
   stage.addEventListener(e, goLive, {passive: true}));
 
@@ -1213,6 +1256,7 @@ addEventListener('resize', () => { if (lb.classList.contains('on') && lbScale < 
    loop
    ===================================================================== */
 function resize() {
+  if (!GL) return;
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
   const r = renderer.getPixelRatio();
@@ -1239,7 +1283,7 @@ addEventListener('resize', () => {
 });
 let vis = true;
 new IntersectionObserver(es => vis = es[0].isIntersecting, {threshold: 0}).observe(canvas);
-renderer.setAnimationLoop(() => {
+if (GL) renderer.setAnimationLoop(() => {
   if (!vis || !cur) return;
   resize();
   if (anim) anim();
@@ -1305,4 +1349,15 @@ paintStatic();
 const first = /^#b(\d)$/.exec(location.hash);
 boardCards();
 await show(first && byIdx[+first[1]] ? +first[1] : 1, true);
+
+// Say why the viewer is a picture rather than leaving somebody poking at a still that will not
+// turn.  Everything else on the page is unaffected and needs no explaining.
+if (!GL) {
+  const n = document.createElement('p');
+  n.className = 'nogl';
+  n.dataset.t = 'no_gl';                 // so the language switch translates it like everything else
+  n.innerHTML = T[lang].no_gl;
+  stage.appendChild(n);
+  document.body.classList.add('no-gl');   // distinct from the <p class=nogl> note
+}
 document.body.classList.add('ready');
